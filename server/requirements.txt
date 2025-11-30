@@ -1,0 +1,6 @@
+flask
+boto3
+redis
+psycopg2-binary
+cryptography
+requests
