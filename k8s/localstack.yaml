@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: localstack
+  namespace: cloud-demo
+spec:
+  selector:
+    matchLabels:
+      app: localstack
+  template:
+    metadata:
+      labels:
+        app: localstack
+    spec:
+      containers:
+        - name: localstack
+          image: localstack/localstack:latest
+          env:
+            - name: SERVICES
+              value: "sts,iam,kms"
+            - name: DEBUG
+              value: "1"
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"
+          ports:
+            - containerPort: 4566
+          volumeMounts:
+            - name: init-script
+              mountPath: /etc/localstack/init/ready.d/init-aws.sh
+              subPath: init-aws.sh
+      volumes:
+        - name: init-script
+          configMap:
+            name: localstack-init
+            defaultMode: 0777
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: localstack
+  namespace: cloud-demo
+spec:
+  selector:
+    app: localstack
+  ports:
+    - port: 4566
+      targetPort: 4566

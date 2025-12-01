@@ -18,14 +18,10 @@ KEYCLOAK_URL = os.environ.get('KEYCLOAK_URL', 'http://localhost:8080')
 LOCALSTACK_URL = os.environ.get('LOCALSTACK_URL', 'http://localhost:4566')
 KMS_KEY_ALIAS = "alias/my-key"
 
-# Redis Client (mTLS)
+# Redis Client (Plaintext - Istio handles mTLS)
 r = redis.Redis(
     host=REDIS_HOST,
     port=REDIS_PORT,
-    ssl=True,
-    ssl_certfile='/certs/client.crt',
-    ssl_keyfile='/certs/client.key',
-    ssl_ca_certs='/certs/ca.crt',
     decode_responses=True
 )
 
@@ -99,6 +95,7 @@ def get_aws_session():
 
 @app.route('/store', methods=['POST'])
 def store():
+    print("mTLS Cert Info:", request.headers.get('X-Forwarded-Client-Cert'))
     key = request.json.get('key')
     payload = request.json.get('payload')
 
