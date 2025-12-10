@@ -1,8 +1,10 @@
 import os
 import psycopg2
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173"]}})
 
 # Config
 DB_HOST = os.environ.get('DB_HOST', 'db')
@@ -30,19 +32,20 @@ def upload_key():
     try:
         conn = get_db_conn()
         cur = conn.cursor()
-        # Upsert key
-        cur.execute("""
-            INSERT INTO public_keys (user_id, public_key)
-            VALUES (%s, %s)
-            ON CONFLICT (user_id) DO UPDATE SET public_key = EXCLUDED.public_key
-        """, (user_id, public_key))
         
-        # Ensure user exists (simple auto-registration for demo)
+        # Ensure user exists FIRST (simple auto-registration for demo)
         cur.execute("""
             INSERT INTO users (user_id, username, password_hash)
             VALUES (%s, %s, 'placeholder')
             ON CONFLICT (user_id) DO NOTHING
         """, (user_id, user_id))
+        
+        # THEN upsert key
+        cur.execute("""
+            INSERT INTO public_keys (user_id, public_key)
+            VALUES (%s, %s)
+            ON CONFLICT (user_id) DO UPDATE SET public_key = EXCLUDED.public_key
+        """, (user_id, public_key))
 
         conn.commit()
         cur.close()

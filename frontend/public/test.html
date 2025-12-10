@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Backend Test</title>
+</head>
+
+<body>
+    <h1>WhatsApp Simulator Backend Test</h1>
+    <div id="results"></div>
+
+    <script>
+        const results = document.getElementById('results');
+
+        async function testBackend() {
+            results.innerHTML = '<p>Testing backend services...</p>';
+
+            // Test Key Service
+            try {
+                results.innerHTML += '<p>Testing Key Service (port 5001)...</p>';
+                const keyResponse = await fetch('http://localhost:5001/keys/test');
+                const keyData = await keyResponse.json();
+                results.innerHTML += `<p style="color: green;">✓ Key Service working: ${JSON.stringify(keyData)}</p>`;
+            } catch (error) {
+                results.innerHTML += `<p style="color: red;">✗ Key Service error: ${error.message}</p>`;
+            }
+
+            // Test Connection Service
+            try {
+                results.innerHTML += '<p>Testing Connection Service (port 8000)...</p>';
+                const connResponse = await fetch('http://localhost:8000/');
+                const connData = await connResponse.json();
+                results.innerHTML += `<p style="color: green;">✓ Connection Service working: ${JSON.stringify(connData)}</p>`;
+            } catch (error) {
+                results.innerHTML += `<p style="color: red;">✗ Connection Service error: ${error.message}</p>`;
+            }
+
+            // Test WebSocket
+            try {
+                results.innerHTML += '<p>Testing WebSocket connection...</p>';
+                const ws = new WebSocket('ws://localhost:8000/ws/test');
+
+                ws.onopen = () => {
+                    results.innerHTML += '<p style="color: green;">✓ WebSocket connected!</p>';
+                    ws.close();
+                };
+
+                ws.onerror = (error) => {
+                    results.innerHTML += `<p style="color: red;">✗ WebSocket error</p>`;
+                };
+            } catch (error) {
+                results.innerHTML += `<p style="color: red;">✗ WebSocket error: ${error.message}</p>`;
+            }
+        }
+
+        testBackend();
+    </script>
+</body>
+
+</html>

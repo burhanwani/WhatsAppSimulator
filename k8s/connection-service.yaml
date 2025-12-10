@@ -17,7 +17,7 @@ spec:
       containers:
         - name: connection-service
           image: connection-service:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           ports:
             - containerPort: 8000
           env:

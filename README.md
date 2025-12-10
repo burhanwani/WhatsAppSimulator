@@ -9,6 +9,37 @@ This project implements a WhatsApp-like messaging platform with:
 - **Zero-Trust Security**: Istio service mesh with automatic mTLS between all services
 - **Envelope Encryption**: AWS KMS integration for encryption at rest
 - **Identity Management**: Keycloak OIDC authentication
+- **Modern Web UI**: React frontend with WhatsApp-style chat interface
+
+## 🚀 Quick Start (Frontend)
+
+Want to see the messaging in action? Try the web interface:
+
+```bash
+# 1. Build and load images (if not done already)
+docker build --no-cache -t key-service:latest ./services/key-service
+docker build --no-cache -t connection-service:latest ./services/connection-service
+minikube image load key-service:latest
+minikube image load connection-service:latest
+
+# 2. Deploy services
+kubectl apply -f k8s/
+kubectl apply -f k8s/db-init-job.yaml
+
+# 3. Start backend port-forwards (in separate terminals)
+# Note: Port 5001 (not 5000) due to macOS AirPlay conflict
+kubectl port-forward svc/key-service 5001:5000 -n cloud-demo
+kubectl port-forward svc/connection-service 8000:8000 -n cloud-demo
+
+# 4. Run the frontend
+cd frontend
+npm install  # First time only
+npm run dev
+```
+
+Then open **http://localhost:5173** to see Alice and Bob chatting with end-to-end encryption!
+
+For detailed frontend documentation, see [frontend/README.md](frontend/README.md)
 
 ## Architecture
 
@@ -117,16 +148,24 @@ istioctl install --set profile=demo -y
 ```
 
 ### 2. Build Microservice Images
+
+> **Note**: If using Minikube, the deployment YAMLs are configured with `imagePullPolicy: Never` to use local images.
+
 ```bash
 # Build all services
-docker build -t connection-service:latest ./services/connection-service
-docker build -t chat-processor:latest ./services/chat-processor
-docker build -t key-service:latest ./services/key-service
+docker build --no-cache -t connection-service:latest ./services/connection-service
+docker build --no-cache -t chat-processor:latest ./services/chat-processor
+docker build --no-cache -t key-service:latest ./services/key-service
 
-# If using Kind, load images into cluster
-kind load docker-image connection-service:latest
-kind load docker-image chat-processor:latest
-kind load docker-image key-service:latest
+# For Minikube: Load images into cluster
+minikube image load connection-service:latest
+minikube image load chat-processor:latest
+minikube image load key-service:latest
+
+# For Kind: Use this instead
+# kind load docker-image connection-service:latest
+# kind load docker-image chat-processor:latest
+# kind load docker-image key-service:latest
 ```
 
 ### 3. Deploy to Kubernetes
@@ -136,9 +175,40 @@ kubectl apply -f k8s/namespace.yaml
 
 # Deploy all components
 kubectl apply -f k8s/
+
+# Initialize database tables
+kubectl apply -f k8s/db-init-job.yaml
+
+# Wait for database initialization to complete
+kubectl wait --for=condition=complete job/db-init -n cloud-demo --timeout=60s
 ```
 
-### 4. Configure Keycloak (Optional)
+### 4. Port-Forward Services for Frontend
+
+> **Important**: Port 5000 is often used by macOS AirPlay/Control Center. We use port **5001** for the Key Service instead.
+
+```bash
+# Terminal 1: Key Service (note port 5001, not 5000)
+kubectl port-forward -n cloud-demo svc/key-service 5001:5000
+
+# Terminal 2: Connection Service
+kubectl port-forward -n cloud-demo svc/connection-service 8000:8000
+```
+
+### 5. Run the Frontend
+
+```bash
+# Install dependencies (first time only)
+cd frontend
+npm install
+
+# Start development server
+npm run dev
+```
+
+Open http://localhost:5173 in your browser to see the WhatsApp Simulator!
+
+### 6. Configure Keycloak (Optional)
 ```bash
 # Port forward Keycloak
 kubectl -n cloud-demo port-forward svc/keycloak 8080:8080
@@ -312,6 +382,96 @@ curl http://localhost:5000/keys/bob
 - [ ] **Web UI**: React/Vue frontend
 - [ ] **Rate Limiting**: API throttling and DDoS protection
 - [ ] **Metrics & Monitoring**: Prometheus + Grafana dashboards
+
+## Troubleshooting
+
+### Port 5000 Already in Use
+
+**Issue**: macOS uses port 5000 for AirPlay/Control Center
+
+**Solution**: We use port **5001** for the Key Service instead
+```bash
+kubectl port-forward svc/key-service 5001:5000 -n cloud-demo
+```
+
+The frontend is already configured to use port 5001.
+
+### CORS Errors in Browser
+
+**Issue**: `No 'Access-Control-Allow-Origin' header` errors
+
+**Solution**: Ensure you rebuilt images with CORS support
+```bash
+# Rebuild with CORS
+docker build --no-cache -t key-service:latest ./services/key-service
+docker build --no-cache -t connection-service:latest ./services/connection-service
+
+# Force reload in Minikube
+kubectl delete deployment key-service connection-service -n cloud-demo
+minikube ssh -- docker rmi -f key-service:latest connection-service:latest
+minikube image load key-service:latest connection-service:latest
+kubectl apply -f k8s/key-service.yaml -f k8s/connection-service.yaml
+```
+
+### Database Errors (Foreign Key Constraint)
+
+**Issue**: `violates foreign key constraint "public_keys_user_id_fkey"`
+
+**Solution**: Initialize the database
+```bash
+kubectl apply -f k8s/db-init-job.yaml
+kubectl wait --for=condition=complete job/db-init -n cloud-demo --timeout=60s
+```
+
+### Images Not Updating
+
+**Issue**: Pods using old Docker images despite rebuild
+
+**Solution**: Use `imagePullPolicy: Never` (already set) and force delete pods
+```bash
+kubectl delete pod -l app=key-service -n cloud-demo
+kubectl delete pod -l app=connection-service -n cloud-demo
+```
+
+### Port-Forward Keeps Dying
+
+**Check active port-forwards**:
+```bash
+ps aux | grep "kubectl port-forward" | grep -v grep
+```
+
+**Kill all and restart**:
+```bash
+pkill -f "kubectl port-forward"
+kubectl port-forward -n cloud-demo svc/key-service 5001:5000 &
+kubectl port-forward -n cloud-demo svc/connection-service 8000:8000 &
+```
+
+### Check Service Logs
+
+```bash
+# Key Service logs
+kubectl logs -n cloud-demo deployment/key-service -c key-service --tail=50
+
+# Connection Service logs
+kubectl logs -n cloud-demo deployment/connection-service -c connection-service --tail=50
+
+# Database logs
+kubectl logs -n cloud-demo deployment/db --tail=50
+```
+
+### Verify Services
+
+```bash
+# Check all pods are running
+kubectl get pods -n cloud-demo
+
+# Test Key Service
+curl -H "Origin: http://localhost:5173" http://localhost:5001/keys/test
+
+# Test Connection Service
+curl http://localhost:8000/
+```
 
 ## Technologies Used
 

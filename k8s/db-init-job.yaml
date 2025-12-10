@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init
+  namespace: cloud-demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: db-init
+          image: postgres:14
+          command:
+            - /bin/bash
+            - -c
+            - |
+              PGPASSWORD=password psql -h db -U user -d mydb -f /scripts/init.sql
+              echo "Database initialized successfully"
+          volumeMounts:
+            - name: init-script
+              mountPath: /scripts
+      volumes:
+        - name: init-script
+          configMap:
+            name: db-init
+      restartPolicy: OnFailure
