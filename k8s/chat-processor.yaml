@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat-processor
+  namespace: cloud-demo
+  labels:
+    app: chat-processor
+spec:
+  selector:
+    matchLabels:
+      app: chat-processor
+  template:
+    metadata:
+      labels:
+        app: chat-processor
+    spec:
+      containers:
+        - name: chat-processor
+          image: chat-processor:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:9092"
+            - name: DB_HOST
+              value: "db"
+            - name: DB_NAME
+              value: "mydb"
+            - name: DB_USER
+              value: "user"
+            - name: DB_PASS
+              value: "password"
+            - name: LOCALSTACK_URL
+              value: "http://localstack:4566"
+            - name: AWS_ACCESS_KEY_ID
+              value: "test"
+            - name: AWS_SECRET_ACCESS_KEY
+              value: "test"
+            - name: AWS_DEFAULT_REGION
+              value: "us-east-1"

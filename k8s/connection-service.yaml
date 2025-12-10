@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: connection-service
+  namespace: cloud-demo
+  labels:
+    app: connection-service
+spec:
+  selector:
+    matchLabels:
+      app: connection-service
+  template:
+    metadata:
+      labels:
+        app: connection-service
+    spec:
+      containers:
+        - name: connection-service
+          image: connection-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:9092"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: connection-service
+  namespace: cloud-demo
+  labels:
+    app: connection-service
+spec:
+  selector:
+    app: connection-service
+  ports:
+    - port: 8000
+      targetPort: 8000

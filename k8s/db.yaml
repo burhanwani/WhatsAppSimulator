@@ -24,6 +24,13 @@ spec:
               value: "mydb"
           ports:
             - containerPort: 5432
+          volumeMounts:
+            - name: db-init
+              mountPath: /docker-entrypoint-initdb.d/
+      volumes:
+        - name: db-init
+          configMap:
+            name: db-init
 ---
 apiVersion: v1
 kind: Service

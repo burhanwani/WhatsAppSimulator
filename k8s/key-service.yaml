@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: key-service
+  namespace: cloud-demo
+  labels:
+    app: key-service
+spec:
+  selector:
+    matchLabels:
+      app: key-service
+  template:
+    metadata:
+      labels:
+        app: key-service
+    spec:
+      containers:
+        - name: key-service
+          image: key-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+          env:
+            - name: DB_HOST
+              value: "db"
+            - name: DB_NAME
+              value: "mydb"
+            - name: DB_USER
+              value: "user"
+            - name: DB_PASS
+              value: "password"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: key-service
+  namespace: cloud-demo
+  labels:
+    app: key-service
+spec:
+  selector:
+    app: key-service
+  ports:
+    - port: 5000
+      targetPort: 5000
