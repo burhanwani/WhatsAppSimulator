@@ -198,7 +198,7 @@ export function RealTimeMessageFlow() {
             position: { x: 980, y: 20 },
             phase: 'message',
             hasEnvoy: true,
-            connections: ['kms', 'postgres'],
+            connections: ['kms', 'postgres', 'redis'],
             data: {
                 title: 'Chat Processor',
                 state: currentStep === 4 || currentStep === 5 ? 'active' : currentStep > 5 ? 'complete' : 'idle',
@@ -262,6 +262,31 @@ export function RealTimeMessageFlow() {
                             { label: 'Sender', value: currentFlow.sender, type: 'text' },
                             { label: 'Recipient', value: currentFlow.recipient, type: 'text' },
                             { label: 'Stored', value: currentStep >= 7 ? '✓' : '...', type: 'status' },
+                        ],
+                    },
+                ],
+            },
+        },
+        {
+            id: 'redis',
+            name: 'Redis Cache',
+            type: 'database',
+            position: { x: 140, y: 720 },
+            phase: 'message',
+            hasEnvoy: true,
+            connections: [],
+            data: {
+                title: 'Redis Cache',
+                state: currentStep === 6 || currentStep === 7 ? 'active' : currentStep > 7 ? 'complete' : 'idle',
+                sections: [
+                    {
+                        icon: '⚡',
+                        title: 'In-Memory Cache',
+                        items: [
+                            { label: 'Type', value: 'Key-Value Store', type: 'text' },
+                            { label: 'Purpose', value: 'Session & Message Cache', type: 'badge' },
+                            { label: 'TTL', value: '1 hour', type: 'text' },
+                            { label: 'Cached', value: currentStep >= 7 ? '✓' : '...', type: 'status' },
                         ],
                     },
                 ],
@@ -350,6 +375,7 @@ export function RealTimeMessageFlow() {
         { id: 'kafka-in-to-processor', from: 'kafka-incoming', to: 'chat-processor', protocol: 'mtls', encryptionLayer: 'mtls', active: currentStep === 3, path: 'M 910 110 L 980 110' },
         { id: 'processor-to-kms', from: 'chat-processor', to: 'kms', protocol: 'mtls', encryptionLayer: 'kms', active: currentStep === 5, path: 'M 1080 210 L 1100 260' },
         { id: 'processor-to-db', from: 'chat-processor', to: 'postgres', protocol: 'mtls', encryptionLayer: 'mtls', active: currentStep === 6, path: 'M 1020 210 L 810 260' },
+        { id: 'processor-to-redis', from: 'chat-processor', to: 'redis', protocol: 'mtls', encryptionLayer: 'mtls', active: currentStep === 6, path: 'M 1020 210 L 340 720' },
         { id: 'db-to-kafka-out', from: 'postgres', to: 'kafka-outgoing', protocol: 'mtls', encryptionLayer: 'mtls', active: currentStep === 7, path: 'M 710 460 L 710 500' },
         { id: 'kafka-out-to-conn', from: 'kafka-outgoing', to: 'connection-service-2', protocol: 'mtls', encryptionLayer: 'mtls', active: currentStep === 8, path: 'M 660 590 L 590 590' },
         { id: 'conn-to-bob', from: 'connection-service-2', to: 'bob', protocol: 'https', encryptionLayer: 'tls', active: currentStep === 9, path: 'M 340 590 L 270 590' },
@@ -401,12 +427,12 @@ export function RealTimeMessageFlow() {
 
             {/* Flow Visualization */}
             <div className="relative max-h-[600px] overflow-auto border border-gray-800 rounded-lg bg-gray-950">
-                <FlowCanvas width={2000} height={850}>
+                <FlowCanvas width={2000} height={950}>
                     {/* SVG Connections */}
                     <svg
                         className="absolute inset-0 pointer-events-none"
                         width={2000}
-                        height={850}
+                        height={950}
                         style={{ zIndex: 0 }}
                     >
                         {connections.map((connection) => (
