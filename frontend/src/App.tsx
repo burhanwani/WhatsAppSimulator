@@ -11,7 +11,7 @@ import {
     generateMessageId,
 } from './utils/crypto';
 import { Loader2 } from 'lucide-react';
-import { RealTimeMessageFlow } from './components/flow';
+import { FlowTabs } from './components/flow';
 import { Button } from './components/ui/button';
 import { messageFlowTracker } from './services/messageFlowTracker';
 
@@ -373,7 +373,7 @@ function App() {
                         </div>
                     ) : (
                         <div className="h-full overflow-auto">
-                            <RealTimeMessageFlow />
+                            <FlowTabs />
                         </div>
                     )}
                 </div>

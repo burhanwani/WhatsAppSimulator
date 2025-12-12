@@ -11,11 +11,15 @@ export type ServiceType =
     | 'keycloak'
     | 'redis'
     | 'istio'
-    | 'envoy';
+    | 'envoy'
+    | 'auth'      // Keycloak authentication
+    | 'cache'     // Redis cache
+    | 'mesh'      // Istio service mesh
+    | 'proxy';    // Envoy proxy
 
 export type EncryptionLayer = 'e2ee' | 'tls' | 'mtls' | 'kms';
 
-export type FlowPhase = 'setup' | 'message';
+export type FlowPhase = 'infrastructure' | 'setup' | 'message';
 
 export interface ServiceBlock {
     id: string;
