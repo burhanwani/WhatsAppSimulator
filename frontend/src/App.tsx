@@ -11,6 +11,9 @@ import {
     generateMessageId,
 } from './utils/crypto';
 import { Loader2 } from 'lucide-react';
+import { RealTimeMessageFlow } from './components/flow';
+import { Button } from './components/ui/button';
+import { messageFlowTracker } from './services/messageFlowTracker';
 
 interface User {
     id: string;
@@ -24,6 +27,7 @@ interface User {
 }
 
 function App() {
+    const [view, setView] = useState<'chat' | 'flow'>('chat');
     const [alice, setAlice] = useState<User>({
         id: 'alice',
         name: 'Alice',
@@ -213,6 +217,26 @@ function App() {
                 timestamp: Date.now(),
             };
             setMessages((prev) => [...prev, chatMsg]);
+
+            // CAPTURE FLOW DATA - Track this message in the flow tracker
+            try {
+                console.log('[FLOW] Capturing message for flow visualization:', messageId);
+                messageFlowTracker.captureMessage({
+                    messageId,
+                    sender: 'alice',
+                    recipient: 'bob',
+                    originalMessage: message,
+                    timestamp: msg.timestamp,
+                    encryption: {
+                        aesKey: 'Generated AES-256 key',
+                        encryptedPayload: encrypted_payload,
+                        encryptedKey: encrypted_key,
+                    },
+                });
+                console.log('[FLOW] Message captured successfully!');
+            } catch (flowError) {
+                console.error('[FLOW] Failed to capture message for flow:', flowError);
+            }
         } catch (error) {
             console.error('[Alice] Failed to send message:', error);
         }
@@ -289,39 +313,69 @@ function App() {
     }
 
     return (
-        <div className="h-screen bg-gray-100 p-4">
-            <div className="max-w-7xl mx-auto h-full">
-                <div className="mb-4 text-center">
-                    <h1 className="text-3xl font-bold text-gray-800 mb-1">
-                        WhatsApp Simulator
-                    </h1>
-                    <p className="text-sm text-gray-600">
-                        End-to-End Encrypted Messaging Demo
-                    </p>
+        <div className="h-screen bg-gray-100">
+            <div className="max-w-7xl mx-auto h-full flex flex-col">
+                {/* Header with View Toggle */}
+                <div className="p-4 bg-white border-b border-gray-200">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-3xl font-bold text-gray-800">
+                                WhatsApp Simulator
+                            </h1>
+                            <p className="text-sm text-gray-600">
+                                End-to-End Encrypted Messaging Demo
+                            </p>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button
+                                variant={view === 'chat' ? 'default' : 'outline'}
+                                onClick={() => setView('chat')}
+                                size="sm"
+                            >
+                                💬 Chat Interface
+                            </Button>
+                            <Button
+                                variant={view === 'flow' ? 'default' : 'outline'}
+                                onClick={() => setView('flow')}
+                                size="sm"
+                            >
+                                🔄 Flow Visualization
+                            </Button>
+                        </div>
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 h-[calc(100%-80px)]">
-                    <ChatWindow
-                        userId={alice.id}
-                        userName={alice.name}
-                        userColor={alice.color}
-                        otherUserId={bob.id}
-                        otherUserName={bob.name}
-                        messages={messages}
-                        onSendMessage={handleAliceSend}
-                        isConnected={alice.connected}
-                    />
+                {/* Content */}
+                <div className="flex-1 p-4 overflow-hidden">
+                    {view === 'chat' ? (
+                        <div className="grid grid-cols-2 gap-4 h-full">
+                            <ChatWindow
+                                userId={alice.id}
+                                userName={alice.name}
+                                userColor={alice.color}
+                                otherUserId={bob.id}
+                                otherUserName={bob.name}
+                                messages={messages}
+                                onSendMessage={handleAliceSend}
+                                isConnected={alice.connected}
+                            />
 
-                    <ChatWindow
-                        userId={bob.id}
-                        userName={bob.name}
-                        userColor={bob.color}
-                        otherUserId={alice.id}
-                        otherUserName={alice.name}
-                        messages={messages}
-                        onSendMessage={handleBobSend}
-                        isConnected={bob.connected}
-                    />
+                            <ChatWindow
+                                userId={bob.id}
+                                userName={bob.name}
+                                userColor={bob.color}
+                                otherUserId={alice.id}
+                                otherUserName={alice.name}
+                                messages={messages}
+                                onSendMessage={handleBobSend}
+                                isConnected={bob.connected}
+                            />
+                        </div>
+                    ) : (
+                        <div className="h-full overflow-auto">
+                            <RealTimeMessageFlow />
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
