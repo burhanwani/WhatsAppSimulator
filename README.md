@@ -241,33 +241,26 @@ kubectl -n cloud-demo port-forward svc/key-service 5000:5000
 kubectl -n cloud-demo port-forward svc/connection-service 8000:8000
 ```
 
-#### 2. Run Simulation
+#### 2. Start Frontend
 ```bash
-python whatsapp_client.py
+cd frontend
+npm run dev
 ```
 
 This demonstrates:
-- Alice and Bob generating RSA key pairs
-- Local E2EE encryption/decryption
-- AES session key encryption with RSA public key
-- Message decryption using RSA private key
+- Real-time E2EE chat between Alice and Bob
+- RSA-2048 + AES-256 encryption in browser
+- WebSocket communication via Connection Service
+- Interactive flow visualization showing message journey
 
-#### 3. Full Integration (with Running Services)
+#### 3. Use the Application
 
-**Python client** (modify `whatsapp_client.py` or use interactive shell):
+**Browser**: Open `http://localhost:5173`
 
-```python
-from whatsapp_client import WhatsAppClient
-
-# Alice registers
-alice = WhatsAppClient("alice")
-alice.generate_keys()
-alice.upload_key()
-
-# Bob registers
-bob = WhatsAppClient("bob")
-bob.generate_keys()
-bob.upload_key()
+- See Alice and Bob chat windows side-by-side
+- Send messages and watch real-time E2EE encryption
+- Toggle to Flow Visualization to see message flow through all 9 services
+- All encryption happens in browser using Web Crypto API
 
 # Alice sends encrypted message to Bob
 encrypted_packet = alice.encrypt_message("bob", "Hello Bob, this is secret!")
@@ -364,7 +357,7 @@ curl http://localhost:5000/keys/bob
 │   ├── localstack.yaml
 │   ├── redis.yaml
 │   └── mtls-strict.yaml        # Istio mTLS policy
-├── whatsapp_client.py          # Python E2EE client
+├── frontend/                   # React E2EE chat UI
 ├── init-aws.sh                 # LocalStack initialization
 └── README.md
 
