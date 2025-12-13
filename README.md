@@ -41,6 +41,27 @@ Then open **http://localhost:5173** to see Alice and Bob chatting with end-to-en
 
 For detailed frontend documentation, see [frontend/README.md](frontend/README.md)
 
+## Frontend Features
+
+### Two-Stage Flow Visualization
+The frontend provides an interactive visualization of the complete message flow:
+
+- **Stage 1: JWT Acquisition** - Shows Keycloak issuing JWT tokens to Alice and Bob with animated token flow
+- **Stage 2: Message Flow** - Real-time visualization of encrypted message routing through all services
+
+### Flow Visualization Phases
+- **Phase 0: Infrastructure Setup** - Shows all Kubernetes services and their interdependencies
+- **Phase 1: Message Flow** - Detailed step-by-step encryption and routing visualization
+- **Phase 2: mTLS** - Service mesh and mutual TLS visualization
+- **Phase 3: Envelope Encryption** - KMS encryption at rest visualization
+- **Phase 4: Keycloak** - OIDC authentication and JWT token flow
+
+### Real-time E2EE Encryption
+- In-browser RSA-2048 + AES-256 encryption using Web Crypto API
+- Ephemeral AES session keys for each message
+- Public key exchange via Key Service
+- Only the recipient can decrypt messages
+
 ## Architecture
 
 ![WhatsApp Simulator Architecture](images/architecture.png)
@@ -121,10 +142,14 @@ Local AWS KMS emulation for envelope encryption
 - Simulates `kms:Encrypt` and `kms:Decrypt` operations
 
 #### **Keycloak**
-OpenID Connect (OIDC) identity provider
-- User authentication
-- OAuth2/OIDC token issuance
-- Can be integrated for service-to-service auth
+OpenID Connect (OIDC) identity provider with **full JWT integration**:
+- User authentication for Alice and Bob (auto-login in the frontend)
+- OAuth2/OIDC token issuance with JWT Bearer tokens
+- JWT validation on all API calls (Key Service, WebSocket connections)
+- Token-based authorization with configurable expiry (5 minutes default)
+- **Realm**: `my-cloud`
+- **Client**: `whatsapp-frontend`
+- **Users**: `alice` and `bob` with password `password`
 
 #### **Istio Service Mesh**
 Zero-trust networking with automatic mTLS
@@ -208,15 +233,26 @@ npm run dev
 
 Open http://localhost:5173 in your browser to see the WhatsApp Simulator!
 
-### 6. Configure Keycloak (Optional)
-```bash
-# Port forward Keycloak
-kubectl -n cloud-demo port-forward svc/keycloak 8080:8080
+### 6. Port-Forward All Services (for Frontend)
 
-# Access at http://localhost:8080 (admin/admin)
-# Create realm: my-cloud
-# Create client: my-microservice
-# Create users as needed
+> **Note**: Open each port-forward in a separate terminal, or use `&` to background them.
+
+```bash
+# Terminal 1: Keycloak (required for authentication)
+kubectl port-forward -n cloud-demo svc/keycloak 8080:8080
+
+# Terminal 2: Key Service (note port 5000, frontend is configured for this)
+kubectl port-forward -n cloud-demo svc/key-service 5000:5000
+
+# Terminal 3: Connection Service (WebSocket endpoint)
+kubectl port-forward -n cloud-demo svc/connection-service 8000:8000
+```
+
+Alternatively, run all in background:
+```bash
+kubectl port-forward -n cloud-demo svc/keycloak 8080:8080 &
+kubectl port-forward -n cloud-demo svc/key-service 5000:5000 &
+kubectl port-forward -n cloud-demo svc/connection-service 8000:8000 &
 ```
 
 ### 5. Initialize Database
