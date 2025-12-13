@@ -1,16 +1,26 @@
+```python
 import os
 import sys
 import psycopg2
+from psycopg2.extras import RealDictCursor
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-# Add parent directory to path to import auth_middleware and cache
+# Add parent directory to path for auth_middleware
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from auth_middleware import auth
-from cache import cache
+from auth_middleware import ServiceAuthenticator
+from cache import CacheManager
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173"]}})
+
+# Enable CORS for frontend
+CORS(app, resources={
+    r"/*": {
+        "origins": ["http://localhost:5173", "http://127.0.0.1:5173"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
 # Config
 DB_HOST = os.environ.get('DB_HOST', 'db')

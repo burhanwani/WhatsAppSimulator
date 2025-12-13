@@ -14,6 +14,7 @@ import { Loader2 } from 'lucide-react';
 import { FlowTabs } from './components/flow';
 import { Button } from './components/ui/button';
 import { messageFlowTracker } from './services/messageFlowTracker';
+import { AuthService } from './services/auth';
 
 interface User {
     id: string;
@@ -50,13 +51,53 @@ function App() {
         connected: false,
     });
 
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);  // Unified for display
     const [isInitializing, setIsInitializing] = useState(true);
     const [initError, setInitError] = useState<string | null>(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-    // Initialize users
+    // Auto-login on mount
     useEffect(() => {
-        async function initialize() {
+        const autoLogin = async () => {
+            // Check if already authenticated
+            if (AuthService.isAuthenticated()) {
+                console.log('✅ Already authenticated:', AuthService.getUsername());
+                setIsAuthenticated(true);
+                return;
+            }
+
+            // Get user from URL parameter or default to alice
+            const params = new URLSearchParams(window.location.search);
+            const user = params.get('user') || 'alice';  // alice or bob
+            const password = user === 'alice' ? 'alice123' : 'bob123';
+
+            try {
+                console.log(`🔐 Auto-logging in as ${user}...`);
+                await AuthService.login(user, password);
+                console.log(`✅ Auto-login successful for ${user}`);
+                setIsAuthenticated(true);
+            } catch (error) {
+                console.error('❌ Auto-login failed:', error);
+                // Set authenticated anyway if AUTH_ENABLED=false
+                setIsAuthenticated(true);
+            }
+        };
+
+        autoLogin();
+    }, []);
+
+    // Remove login screen - auto-login handles authentication
+    // if (!isAuthenticated) {
+    //     return <Login onLoginSuccess={() => setIsAuthenticated(true)} />;
+    // }
+
+    // Initialize users - WAIT for authentication to complete
+    useEffect(() => {
+        if (!isAuthenticated) {
+            return;  // Don't initialize until authenticated
+        }
+
+        const initializeUsers = async () => {
             try {
                 console.log('Initializing WhatsApp Simulator...');
 
@@ -95,8 +136,8 @@ function App() {
                     console.log('[Alice] Received message:', msg);
                     try {
                         const decrypted = await decryptMessage(
-                            msg.payload?.encrypted_payload || msg.encrypted_payload,
-                            msg.payload?.encrypted_key || msg.encrypted_key,
+                            msg.encrypted_payload,
+                            msg.encrypted_key,
                             aliceKeyPair.privateKey
                         );
 
@@ -107,7 +148,7 @@ function App() {
                             timestamp: msg.timestamp || Date.now(),
                         };
 
-                        setMessages((prev) => [...prev, chatMsg]);
+                        setMessages((prev: ChatMessage[]) => [...prev, chatMsg]);
                     } catch (error) {
                         console.error('[Alice] Decryption failed:', error);
                     }
@@ -117,8 +158,8 @@ function App() {
                     console.log('[Bob] Received message:', msg);
                     try {
                         const decrypted = await decryptMessage(
-                            msg.payload?.encrypted_payload || msg.encrypted_payload,
-                            msg.payload?.encrypted_key || msg.encrypted_key,
+                            msg.encrypted_payload,
+                            msg.encrypted_key,
                             bobKeyPair.privateKey
                         );
 
@@ -129,7 +170,7 @@ function App() {
                             timestamp: msg.timestamp || Date.now(),
                         };
 
-                        setMessages((prev) => [...prev, chatMsg]);
+                        setMessages((prev: ChatMessage[]) => [...prev, chatMsg]);
                     } catch (error) {
                         console.error('[Bob] Decryption failed:', error);
                     }
@@ -179,14 +220,13 @@ function App() {
             }
         }
 
-        initialize();
-
+        initializeUsers();
         // Cleanup
         return () => {
             alice.wsManager?.disconnect();
             bob.wsManager?.disconnect();
         };
-    }, []);
+    }, [isAuthenticated]);  // Run when authentication completes
 
     const handleAliceSend = async (message: string) => {
         if (!alice.otherUserPublicKey || !alice.wsManager) return;
@@ -216,7 +256,7 @@ function App() {
                 senderId: 'alice',
                 timestamp: Date.now(),
             };
-            setMessages((prev) => [...prev, chatMsg]);
+            setMessages((prev: ChatMessage[]) => [...prev, chatMsg]);
 
             // CAPTURE FLOW DATA - Track this message in the flow tracker
             try {
@@ -270,7 +310,7 @@ function App() {
                 senderId: 'bob',
                 timestamp: Date.now(),
             };
-            setMessages((prev) => [...prev, chatMsg]);
+            setMessages((prev: ChatMessage[]) => [...prev, chatMsg]);
         } catch (error) {
             console.error('[Bob] Failed to send message:', error);
         }
@@ -330,7 +370,6 @@ function App() {
                             <Button
                                 variant={view === 'chat' ? 'default' : 'outline'}
                                 onClick={() => setView('chat')}
-                                size="sm"
                             >
                                 💬 Chat Interface
                             </Button>

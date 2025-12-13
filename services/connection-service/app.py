@@ -1,11 +1,16 @@
 import os
 import json
 import asyncio
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import sys
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from kafka import KafkaProducer, KafkaConsumer
 import uvicorn
 import threading
+
+# Add parent directory to path for auth_middleware
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from auth_middleware import ServiceAuthenticator
 
 app = FastAPI()
 
@@ -86,12 +91,41 @@ def consume_outgoing():
                 # Ideally we should use aiokafka.
                 pass 
 
+# Initialize authenticator
+auth = ServiceAuthenticator()
+
 # For this demo, we will skip the complex async-kafka integration and just focus on the WebSocket -> Kafka part.
 # The "Receive" part will be simulated or we assume the client polls (not ideal) or we implement a simple polling endpoint.
 # OR we use `aiokafka` which works well with FastAPI.
 
+# WebSocket endpoint with JWT authentication
 @app.websocket("/ws/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: str):
+async def websocket_endpoint(websocket: WebSocket, user_id: str, token: str = Query(None)):
+    # Validate JWT token
+    if not token:
+        await websocket.close(code=1008, reason="Missing authentication token")
+        print(f"❌ WebSocket connection rejected for {user_id}: No token provided")
+        return
+    
+    try:
+        # Verify the JWT token
+        claims = auth.verify_token(token)
+        token_username = claims.get('preferred_username') or claims.get('sub')
+        
+        # Verify the user matches the token
+        if token_username != user_id:
+            await websocket.close(code=1008, reason="Token user mismatch")
+            print(f"❌ WebSocket connection rejected: {token_username} tried to connect as {user_id}")
+            return
+        
+        print(f"✅ WebSocket authenticated: {user_id}")
+        
+    except Exception as e:
+        await websocket.close(code=1008, reason=f"Authentication failed: {str(e)}")
+        print(f"❌ WebSocket authentication failed for {user_id}: {e}")
+        return
+    
+    # Authentication successful - proceed with connection
     await manager.connect(websocket, user_id)
     try:
         while True:

@@ -1,6 +1,8 @@
 /**
- * WebSocket Manager for real-time messaging
+ * WebSocket Manager for real-time messaging with JWT authentication
  */
+
+import { AuthService } from './auth';
 
 export interface Message {
     message_id: string;
@@ -24,10 +26,12 @@ export class WebSocketManager {
         this.userId = userId;
     }
 
-    connect(): Promise<void> {
-        return new Promise((resolve, reject) => {
+    async connect(): Promise<void> {
+        return new Promise(async (resolve, reject) => {
             try {
-                const wsUrl = `ws://localhost:8000/ws/${this.userId}`;
+                // Get JWT token for WebSocket authentication
+                const token = await AuthService.getValidToken();
+                const wsUrl = `ws://localhost:8000/ws/${this.userId}?token=${encodeURIComponent(token)}`;
                 this.ws = new WebSocket(wsUrl);
 
                 this.ws.onopen = () => {
