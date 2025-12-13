@@ -3,6 +3,7 @@
  */
 
 import { AuthService } from './auth';
+import { messageFlowTracker } from './messageFlowTracker';
 
 export interface Message {
     message_id: string;
@@ -31,6 +32,32 @@ export class WebSocketManager {
             try {
                 // Get JWT token for WebSocket authentication
                 const token = await AuthService.getValidToken();
+
+                // Track WebSocket JWT authentication
+                const messageId = 'ws-auth-' + this.userId + '-' + Date.now();
+                messageFlowTracker.captureMessage({
+                    messageId,
+                    sender: this.userId,
+                    recipient: 'connection-service',
+                    originalMessage: 'WebSocket Authentication',
+                    timestamp: Date.now(),
+                    encryption: { aesKey: '', encryptedPayload: '', encryptedKey: '' },
+                    serviceData: {},
+                    currentStep: 1,
+                    steps: [{
+                        stepNumber: 1,
+                        timestamp: Date.now(),
+                        service: 'connection-service',
+                        action: 'WebSocket JWT Validation',
+                        data: { userId: this.userId, protocol: 'websocket' },
+                        encryptionLayers: ['jwt', 'tls'],
+                        jwtData: {
+                            token: token.substring(0, 20) + '...',
+                            username: this.userId,
+                        },
+                    }],
+                });
+
                 const wsUrl = `ws://localhost:8000/ws/${this.userId}?token=${encodeURIComponent(token)}`;
                 this.ws = new WebSocket(wsUrl);
 

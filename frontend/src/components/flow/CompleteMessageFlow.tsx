@@ -161,6 +161,10 @@ export function CompleteMessageFlow() {
                 <div className="absolute bottom-4 right-4 bg-gray-900/90 border border-gray-700 rounded-lg p-3 space-y-1 text-xs">
                     <div className="font-semibold text-white mb-2">Encryption Layers</div>
                     <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                        <span className="text-gray-300">JWT (Authentication)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-green-500"></div>
                         <span className="text-gray-300">E2EE (Client-side)</span>
                     </div>
@@ -173,7 +177,7 @@ export function CompleteMessageFlow() {
                         <span className="text-gray-300">mTLS (Service Mesh)</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                         <span className="text-gray-300">KMS (Envelope)</span>
                     </div>
                 </div>

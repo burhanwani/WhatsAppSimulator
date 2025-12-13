@@ -2,6 +2,32 @@ import { ServiceBlock, Connection } from '@/types/flow';
 
 // Complete service data for Phase 1: Message Flow
 export const messageFlowServices: ServiceBlock[] = [
+    // Authentication: Keycloak issues JWTs to Alice and Bob
+    {
+        id: 'keycloak-auth',
+        name: 'Keycloak',
+        type: 'keycloak',
+        position: { x: 150, y: -80 },
+        phase: 'setup',
+        hasEnvoy: false,
+        connections: ['alice', 'bob'],
+        data: {
+            title: 'Keycloak Auth Server',
+            state: 'idle',
+            sections: [
+                {
+                    icon: '🔑',
+                    title: 'JWT Tokens',
+                    items: [
+                        { label: 'Alice Token', value: 'eyJhbGciOiJSUzI1Ni...', type: 'code' },
+                        { label: 'Bob Token', value: 'eyJhbGciOiJSUzI1Ni...', type: 'code' },
+                        { label: 'Expires', value: '3600s', type: 'badge' },
+                    ],
+                },
+            ],
+        },
+    },
+
     // Row 1: Alice → Connection Service → Kafka
     {
         id: 'alice',
@@ -306,6 +332,27 @@ export const infrastructureServices: ServiceBlock[] = [
 
 // Connection paths for message flow
 export const messageFlowConnections: Connection[] = [
+    // JWT Authentication connections
+    {
+        id: 'keycloak-to-alice',
+        from: 'keycloak-auth',
+        to: 'alice',
+        protocol: 'https',
+        encryptionLayer: 'jwt',
+        active: false,
+        path: 'M 200 -30 L 150 50',
+    },
+    {
+        id: 'keycloak-to-bob',
+        from: 'keycloak-auth',
+        to: 'bob',
+        protocol: 'https',
+        encryptionLayer: 'jwt',
+        active: false,
+        path: 'M 200 -30 L 150 350',
+    },
+
+    // Message flow connections
     {
         id: 'alice-to-conn',
         from: 'alice',
@@ -382,6 +429,15 @@ export const messageFlowConnections: Connection[] = [
 
 // Flow steps defining the animation sequence
 export const messageFlowSteps = [
+    // JWT Authentication Phase
+    { service: 'keycloak-auth', action: 'Alice requests JWT token', connection: null },
+    { service: 'keycloak-auth', action: 'Issuing JWT for Alice', connection: 'keycloak-to-alice' },
+    { service: 'alice', action: 'JWT token received and stored', connection: null },
+    { service: 'keycloak-auth', action: 'Bob requests JWT token', connection: null },
+    { service: 'keycloak-auth', action: 'Issuing JWT for Bob', connection: 'keycloak-to-bob' },
+    { service: 'bob', action: 'JWT token received and stored', connection: null },
+
+    // Message Flow Phase
     { service: 'alice', action: 'Encrypting message with E2EE', connection: null },
     { service: 'alice', action: 'Sending to Connection Service', connection: 'alice-to-conn' },
     { service: 'connection-service-1', action: 'Receiving via WebSocket', connection: 'conn-to-kafka-in' },

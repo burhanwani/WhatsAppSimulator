@@ -17,7 +17,7 @@ export type ServiceType =
     | 'mesh'      // Istio service mesh
     | 'proxy';    // Envoy proxy
 
-export type EncryptionLayer = 'e2ee' | 'tls' | 'mtls' | 'kms';
+export type EncryptionLayer = 'e2ee' | 'tls' | 'mtls' | 'kms' | 'jwt';
 
 export type FlowPhase = 'infrastructure' | 'setup' | 'message';
 
@@ -70,6 +70,12 @@ export interface FlowStep {
     action: string;
     data: Record<string, any>;
     encryptionLayers: EncryptionLayer[];
+    jwtData?: {
+        token?: string;  // Truncated token for display
+        username?: string;
+        expiresIn?: number;
+        scope?: string[];
+    };
 }
 
 export interface FlowData {

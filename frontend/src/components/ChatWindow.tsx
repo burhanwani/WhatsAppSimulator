@@ -43,7 +43,7 @@ export function ChatWindow({
     return (
         <Card className="flex flex-col h-screen shadow-lg overflow-hidden">
             <ChatHeader
-                userName={userName}
+                userName={otherUserName}
                 userColor={userColor}
                 isConnected={isConnected}
             />

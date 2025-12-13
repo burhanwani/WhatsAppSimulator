@@ -10,10 +10,11 @@ interface DataParticleProps {
 
 const getParticleColor = (layer: EncryptionLayer) => {
     switch (layer) {
+        case 'jwt': return '#F97316';  // orange-500
         case 'e2ee': return '#22C55E'; // green-500
         case 'tls': return '#3B82F6';  // blue-500
         case 'mtls': return '#A855F7'; // purple-500
-        case 'kms': return '#F59E0B';  // orange-500
+        case 'kms': return '#EAB308';  // yellow-500
         default: return '#6B7280';     // gray-500
     }
 };

@@ -5,6 +5,7 @@ import { EnvoyWrapper } from './EnvoyWrapper';
 import { ConnectionLine } from './ConnectionLine';
 import { DataParticle } from './DataParticle';
 import { FlowControls } from './FlowControls';
+import { JWTFlowVisualization } from './JWTFlowVisualization';
 import { messageFlowTracker, MessageFlowData } from '@/services/messageFlowTracker';
 import { Connection, ServiceBlock as ServiceBlockType } from '@/types/flow';
 
@@ -14,9 +15,51 @@ export function RealTimeMessageFlow() {
     const [isPlaying, setIsPlaying] = useState(false);
     const [speed, setSpeed] = useState(1);
 
+    // Stage toggle: 1 = JWT Acquisition, 2 = Message Flow
+    const [activeStage, setActiveStage] = useState<1 | 2>(1);
+
+    // State for JWT auth flows - these are captured during login before messages are sent
+    const [jwtLoginFlows, setJwtLoginFlows] = useState<MessageFlowData[]>([]);
+    const [jwtApiFlows, setJwtApiFlows] = useState<MessageFlowData[]>([]);
+
+    // Helper function to categorize and update JWT flows from tracker
+    const updateJwtFlowsFromTracker = () => {
+        const allFlows = messageFlowTracker.getAllFlows();
+        console.log('[FLOW DEBUG] updateJwtFlowsFromTracker - allFlows count:', allFlows.length);
+
+        // Filter JWT-related flows
+        const jwtFlows = allFlows.filter((flow: MessageFlowData) =>
+            flow.messageId.includes('jwt-login') ||
+            flow.messageId.includes('key-upload') ||
+            flow.messageId.includes('key-fetch') ||
+            flow.messageId.includes('ws-auth')
+        );
+
+        const loginFlows = jwtFlows.filter((f: MessageFlowData) => f.messageId.includes('jwt-login'));
+        const apiFlows = jwtFlows.filter((f: MessageFlowData) =>
+            f.messageId.includes('key-upload') ||
+            f.messageId.includes('key-fetch') ||
+            f.messageId.includes('ws-auth')
+        );
+
+        console.log('[FLOW DEBUG] JWT flows found - login:', loginFlows.length, 'api:', apiFlows.length);
+
+        // Only update state if counts changed to avoid infinite loops
+        if (loginFlows.length !== jwtLoginFlows.length) {
+            setJwtLoginFlows(loginFlows);
+        }
+        if (apiFlows.length !== jwtApiFlows.length) {
+            setJwtApiFlows(apiFlows);
+        }
+    };
+
     // DEBUG: Log component mount
     useEffect(() => {
         console.log('[FLOW DEBUG] RealTimeMessageFlow component mounted');
+
+        // Load existing JWT flows on mount
+        updateJwtFlowsFromTracker();
+
         return () => {
             console.log('[FLOW DEBUG] RealTimeMessageFlow component unmounted');
         };
@@ -28,18 +71,37 @@ export function RealTimeMessageFlow() {
 
         const unsubscribe = messageFlowTracker.subscribe((_messageId, data) => {
             console.log('[FLOW DEBUG] Subscription callback fired!');
-            console.log('[FLOW DEBUG] Received data:', data);
-            setCurrentFlow(data);
-            setCurrentStep(0);
-            setIsPlaying(true); // Auto-play when new message comes in
+            console.log('[FLOW DEBUG] Received data messageId:', data.messageId);
+
+            // Check if this is a JWT-related flow or a message flow
+            const isJwtFlow = data.messageId.includes('jwt-login') ||
+                data.messageId.includes('key-upload') ||
+                data.messageId.includes('key-fetch') ||
+                data.messageId.includes('ws-auth');
+
+            if (isJwtFlow) {
+                // Update JWT flow state
+                updateJwtFlowsFromTracker();
+            } else {
+                // This is a message flow - set it as the current flow
+                setCurrentFlow(data);
+                setCurrentStep(0);
+                setIsPlaying(true); // Auto-play when new message comes in
+            }
         });
 
-        // Check if there's already a flow captured
-        const latestFlow = messageFlowTracker.getLatestFlow();
-        console.log('[FLOW DEBUG] Checking for existing flow on mount:', latestFlow);
-        if (latestFlow) {
-            console.log('[FLOW DEBUG] Found existing flow, setting it');
-            setCurrentFlow(latestFlow);
+        // Check if there's already a message flow captured (not JWT auth flows)
+        const allFlows = messageFlowTracker.getAllFlows();
+        const messageFlow = allFlows.find(f =>
+            !f.messageId.includes('jwt-login') &&
+            !f.messageId.includes('key-upload') &&
+            !f.messageId.includes('key-fetch') &&
+            !f.messageId.includes('ws-auth')
+        );
+
+        if (messageFlow) {
+            console.log('[FLOW DEBUG] Found existing message flow, setting it');
+            setCurrentFlow(messageFlow);
         }
 
         return () => {
@@ -71,24 +133,92 @@ export function RealTimeMessageFlow() {
         return () => clearInterval(interval);
     }, [isPlaying, speed, currentFlow]);
 
-    // If no message has been sent yet
-    if (!currentFlow) {
-        console.log('[FLOW DEBUG] Rendering "No Message Sent Yet" screen');
+    // Stage toggle header component
+    const StageToggle = () => (
+        <div className="mb-4 p-3 bg-gray-900 border border-gray-800 rounded-lg">
+            <div className="flex items-center justify-between">
+                <div className="flex gap-2">
+                    <button
+                        onClick={() => setActiveStage(1)}
+                        className={`px-4 py-2 font-medium rounded-lg transition-all ${activeStage === 1
+                            ? 'bg-orange-600 text-white shadow-lg shadow-orange-500/20'
+                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                            }`}
+                    >
+                        🔐 Stage 1: JWT Acquisition
+                    </button>
+                    <button
+                        onClick={() => setActiveStage(2)}
+                        className={`px-4 py-2 font-medium rounded-lg transition-all ${activeStage === 2
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                            }`}
+                    >
+                        💬 Stage 2: Message Flow
+                    </button>
+                </div>
+                <div className="text-sm text-gray-500">
+                    {activeStage === 1 ? 'Keycloak → JWT Tokens' : 'Alice → Bob (E2EE)'}
+                </div>
+            </div>
+        </div>
+    );
+
+    // Stage 1: JWT Acquisition Flow (always available since auto-login)
+    if (activeStage === 1) {
         return (
-            <div className="w-full space-y-4">
-                <div className="p-8 bg-gray-900 border border-gray-800 rounded-lg text-center">
-                    <h2 className="text-xl font-bold text-white mb-2">
-                        No Message Sent Yet
-                    </h2>
-                    <p className="text-gray-400">
-                        Send a message from Alice in the Chat Interface to see the real-time flow visualization!
-                    </p>
-                    <p className="text-sm text-gray-500 mt-4">
-                        Switch to the <strong>💬 Chat Interface</strong> tab and send a message to begin.
-                    </p>
-                    <div className="mt-4 p-2 bg-blue-900/20 border border-blue-500 rounded text-xs text-blue-400">
-                        DEBUG: Check browser console for [FLOW DEBUG] messages
+            <div className="w-full">
+                <StageToggle />
+                <JWTFlowVisualization loginFlows={jwtLoginFlows} apiFlows={jwtApiFlows} />
+            </div>
+        );
+    }
+
+    // Stage 2: Message Flow - Show waiting screen if no message sent yet
+    if (!currentFlow) {
+        console.log('[FLOW DEBUG] Stage 2: No message flow yet');
+
+        return (
+            <div className="w-full">
+                <StageToggle />
+                <div className="space-y-4">
+                    <div className="p-8 bg-gray-900 border border-gray-800 rounded-lg text-center">
+                        <h2 className="text-xl font-bold text-white mb-2">
+                            No Message Sent Yet
+                        </h2>
+                        <p className="text-gray-400">
+                            Send a message from Alice in the Chat Interface to see the real-time flow visualization!
+                        </p>
+                        <p className="text-sm text-gray-500 mt-4">
+                            Switch to the <strong>💬 Chat Interface</strong> tab and send a message to begin.
+                        </p>
                     </div>
+
+                    {/* JWT Authentication Status Summary */}
+                    {(jwtLoginFlows.length > 0 || jwtApiFlows.length > 0) && (
+                        <div className="p-4 bg-gray-900 border border-green-800/50 rounded-lg">
+                            <h3 className="text-lg font-semibold text-white mb-2 flex items-center gap-2">
+                                <span className="text-green-400">✅</span> Authentication Complete
+                            </h3>
+                            <div className="text-sm text-gray-400">
+                                <p>Both users are authenticated with JWT tokens from Keycloak.</p>
+                                <p className="mt-1">
+                                    Switch to <strong className="text-orange-400">Stage 1</strong> to see the JWT acquisition flow.
+                                </p>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                                <span className="px-2 py-1 bg-gray-800 text-gray-300 rounded">
+                                    🔐 JWT Logins: {jwtLoginFlows.length}
+                                </span>
+                                <span className="px-2 py-1 bg-gray-800 text-gray-300 rounded">
+                                    🔑 Key Operations: {jwtApiFlows.filter(f => f.messageId.includes('key-')).length}
+                                </span>
+                                <span className="px-2 py-1 bg-gray-800 text-gray-300 rounded">
+                                    📡 WebSocket Auth: {jwtApiFlows.filter(f => f.messageId.includes('ws-auth')).length}
+                                </span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         );
@@ -110,6 +240,15 @@ export function RealTimeMessageFlow() {
                 title: "Alice's Browser",
                 state: currentStep === 0 ? 'active' : currentStep > 0 ? 'complete' : 'idle',
                 sections: [
+                    {
+                        icon: '🔐',
+                        title: 'JWT Authentication',
+                        items: [
+                            { label: 'User', value: 'alice', type: 'badge' },
+                            { label: 'JWT Token', value: jwtLoginFlows.find(f => f.sender === 'alice')?.authData?.token || 'eyJ...', type: 'code' },
+                            { label: 'Auth Status', value: jwtLoginFlows.find(f => f.sender === 'alice') ? '✓ Authenticated' : 'Pending', type: 'status' },
+                        ],
+                    },
                     {
                         icon: '🔑',
                         title: 'E2EE Encryption',
@@ -138,6 +277,15 @@ export function RealTimeMessageFlow() {
                 title: 'Connection Service',
                 state: currentStep === 1 || currentStep === 2 ? 'active' : currentStep > 2 ? 'complete' : 'idle',
                 sections: [
+                    {
+                        icon: '🔐',
+                        title: 'JWT Validation',
+                        items: [
+                            { label: 'Bearer Token', value: jwtApiFlows.find(f => f.messageId.includes('ws-auth'))?.authData?.token || 'Validated', type: 'code' },
+                            { label: 'Issuer', value: 'Keycloak', type: 'badge' },
+                            { label: 'Verified', value: '✓', type: 'status' },
+                        ],
+                    },
                     {
                         icon: '🔐',
                         title: 'mTLS',
@@ -412,6 +560,8 @@ export function RealTimeMessageFlow() {
 
     return (
         <div className="w-full space-y-4">
+            {/* Stage Toggle */}
+            <StageToggle />
             {/* Title */}
             <div className="p-4 bg-gray-900 border border-gray-800 rounded-lg">
                 <h2 className="text-xl font-bold text-white">
@@ -479,6 +629,10 @@ export function RealTimeMessageFlow() {
                 <div className="absolute bottom-4 right-4 bg-gray-900/90 border border-gray-700 rounded-lg p-3 space-y-1 text-xs">
                     <div className="font-semibold text-white mb-2">Encryption Layers</div>
                     <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                        <span className="text-gray-300">JWT (Authentication)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-green-500"></div>
                         <span className="text-gray-300">E2EE (Client-side)</span>
                     </div>
@@ -491,7 +645,7 @@ export function RealTimeMessageFlow() {
                         <span className="text-gray-300">mTLS (Service Mesh)</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                         <span className="text-gray-300">KMS (Envelope)</span>
                     </div>
                 </div>

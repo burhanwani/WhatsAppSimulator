@@ -8,6 +8,8 @@
  * - Automatic token refresh
  */
 
+import { messageFlowTracker } from './messageFlowTracker';
+
 const KEYCLOAK_URL = 'http://localhost:8080';
 const REALM = 'my-cloud';
 const CLIENT_ID = 'whatsapp-frontend';
@@ -18,6 +20,7 @@ interface TokenResponse {
     expires_in: number;
     refresh_expires_in: number;
     token_type: string;
+    scope?: string;
 }
 
 export class AuthService {
@@ -65,6 +68,46 @@ export class AuthService {
             );
 
             console.log('✅ Login successful:', username);
+
+            // Track JWT token issuance in flow
+            messageFlowTracker.captureMessage({
+                messageId: 'jwt-login-' + username + '-' + Date.now(),
+                sender: username,
+                recipient: 'keycloak',
+                originalMessage: 'JWT Authentication',
+                timestamp: Date.now(),
+                encryption: {
+                    aesKey: '',
+                    encryptedPayload: '',
+                    encryptedKey: '',
+                },
+                serviceData: {},
+                currentStep: 1,
+                authData: {
+                    username,
+                    loginTimestamp: Date.now(),
+                    token: data.access_token.substring(0, 20) + '...',
+                    tokenExpiry: Date.now() + (data.expires_in * 1000),
+                },
+                steps: [{
+                    stepNumber: 1,
+                    timestamp: Date.now(),
+                    service: 'keycloak',
+                    action: 'JWT Token Issued',
+                    data: {
+                        username,
+                        tokenType: data.token_type,
+                        expiresIn: data.expires_in,
+                    },
+                    encryptionLayers: ['jwt'],
+                    jwtData: {
+                        token: data.access_token.substring(0, 20) + '...',
+                        username,
+                        expiresIn: data.expires_in,
+                        scope: data.scope ? data.scope.split(' ') : [],
+                    },
+                }],
+            });
         } catch (error) {
             console.error('Login error:', error);
             throw error;

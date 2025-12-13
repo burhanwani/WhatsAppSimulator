@@ -38,6 +38,14 @@ export interface MessageFlowData {
         };
     };
 
+    // Authentication data
+    authData?: {
+        username: string;
+        loginTimestamp: number;
+        token: string;  // Truncated JWT
+        tokenExpiry: number;
+    };
+
     // Flow tracking
     currentStep: number;
     steps: FlowStep[];
@@ -91,9 +99,20 @@ class MessageFlowTracker {
         return this.flows.get(messageId);
     }
 
-    getLatestFlow(): MessageFlowData | undefined {
-        const flows = Array.from(this.flows.values());
-        return flows.length > 0 ? flows[flows.length - 1] : undefined;
+    /**
+     * Get the latest captured flow
+     */
+    getLatestFlow(): MessageFlowData | null {
+        if (this.flows.size === 0) return null;
+        const lastKey = Array.from(this.flows.keys()).pop();
+        return lastKey ? this.flows.get(lastKey) || null : null;
+    }
+
+    /**
+     * Get all captured flows
+     */
+    getAllFlows(): MessageFlowData[] {
+        return Array.from(this.flows.values());
     }
 
     subscribe(callback: (messageId: string, data: MessageFlowData) => void) {
@@ -102,7 +121,7 @@ class MessageFlowTracker {
     }
 
     private notifyListeners(messageId: string, data: MessageFlowData) {
-        console.log('[TRACKER DEBUG] notifyListeners called with messageId:', messageId);
+        console.log('[TRACKER DEBUG] notifyListeners called with:', messageId);
         console.log('[TRACKER DEBUG] Notifying', this.listeners.size, 'listeners');
         this.listeners.forEach((listener, index) => {
             console.log('[TRACKER DEBUG] Calling listener', index);
@@ -116,3 +135,54 @@ class MessageFlowTracker {
 }
 
 export const messageFlowTracker = new MessageFlowTracker();
+
+// Expose debug methods to browser console for verification
+if (typeof window !== 'undefined') {
+    (window as any).debugJWTFlows = {
+        getAllFlows: () => messageFlowTracker.getAllFlows(),
+        getJWTFlows: () => {
+            const allFlows = messageFlowTracker.getAllFlows();
+            return allFlows.filter(f =>
+                f.messageId.includes('jwt-login') ||
+                f.messageId.includes('key-upload') ||
+                f.messageId.includes('key-fetch') ||
+                f.messageId.includes('ws-auth')
+            );
+        },
+        getLoginFlows: () => {
+            const allFlows = messageFlowTracker.getAllFlows();
+            return allFlows.filter(f => f.messageId.includes('jwt-login'));
+        },
+        printFlowSummary: () => {
+            const allFlows = messageFlowTracker.getAllFlows();
+            const jwtFlows = allFlows.filter(f =>
+                f.messageId.includes('jwt-login') ||
+                f.messageId.includes('key-upload') ||
+                f.messageId.includes('key-fetch') ||
+                f.messageId.includes('ws-auth')
+            );
+            console.log('='.repeat(50));
+            console.log('JWT Flow Debug Summary');
+            console.log('='.repeat(50));
+            console.log('Total flows:', allFlows.length);
+            console.log('JWT-related flows:', jwtFlows.length);
+            console.log('  - jwt-login:', allFlows.filter(f => f.messageId.includes('jwt-login')).length);
+            console.log('  - key-upload:', allFlows.filter(f => f.messageId.includes('key-upload')).length);
+            console.log('  - key-fetch:', allFlows.filter(f => f.messageId.includes('key-fetch')).length);
+            console.log('  - ws-auth:', allFlows.filter(f => f.messageId.includes('ws-auth')).length);
+            console.log('='.repeat(50));
+            if (jwtFlows.length > 0) {
+                console.log('JWT Flows:');
+                jwtFlows.forEach((f, i) => {
+                    console.log(`  ${i + 1}. ${f.messageId} (sender: ${f.sender})`);
+                });
+            }
+            return { total: allFlows.length, jwt: jwtFlows.length };
+        },
+    };
+    console.log('🔍 [DEBUG] JWT Flow debug methods available at window.debugJWTFlows');
+    console.log('   - debugJWTFlows.printFlowSummary()');
+    console.log('   - debugJWTFlows.getAllFlows()');
+    console.log('   - debugJWTFlows.getJWTFlows()');
+    console.log('   - debugJWTFlows.getLoginFlows()');
+}
